@@ -48,3 +48,11 @@ header:
       fr-LU   : *FR
       # @end locale config
     url: /about.html
+
+  - titles:
+      # @start locale config
+      en      : &EN       RSS
+      zh-Hans : &ZH_HANS  RSS
+
+      # @end locale config
+    url: /feed.xml
