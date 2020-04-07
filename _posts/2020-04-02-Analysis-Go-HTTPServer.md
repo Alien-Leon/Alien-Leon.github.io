@@ -2,7 +2,7 @@
 title: 浅析 Go HTTPServer
 tags: Go 协议 源码分析
 key: Analysis-Go-HTTPServer
-modify_date: 2020-04-04 22:32:25 
+modify_date: 2020-04-07 16:22:53 
 ---
 
 # 浅析 Go HTTPServer
@@ -11,11 +11,11 @@ modify_date: 2020-04-04 22:32:25
 
 ```go
 func handler(w http.ResponseWriter, r *http.Request)  {
-	fmt.Fprint(w, "hello world!")
+    fmt.Fprint(w, "hello world!")
 }
 
 func main() {
-	http.HandleFunc("/", handler)
+    http.HandleFunc("/", handler)
     log.Fatal(http.ListenAndServe(":8080", nil))
 }
 ```
@@ -30,30 +30,30 @@ func main() {
 ### 连接相关
 ```go
 type conn struct {
-	// server is the server on which the connection arrived.
-	server *Server
+    // server is the server on which the connection arrived.
+    server *Server
 
-	// cancelCtx cancels the connection-level context.
-	cancelCtx context.CancelFunc
+    // cancelCtx cancels the connection-level context.
+    cancelCtx context.CancelFunc
 
-	// rwc is the underlying network connection.
-	rwc net.Conn
+    // rwc is the underlying network connection.
+    rwc net.Conn
 
-	remoteAddr string
+    remoteAddr string
 
-	// r is bufr's read source. It's a wrapper around rwc that provides
-	// io.LimitedReader-style limiting (while reading request headers)
-	// and functionality to support CloseNotifier. See *connReader docs.
-	r *connReader
+    // r is bufr's read source. It's a wrapper around rwc that provides
+    // io.LimitedReader-style limiting (while reading request headers)
+    // and functionality to support CloseNotifier. See *connReader docs.
+    r *connReader
 
-	// bufr reads from r.
-	bufr *bufio.Reader
+    // bufr reads from r.
+    bufr *bufio.Reader
 
-	// bufw writes to checkConnErrorWriter{c}, which populates werr on error.
-	bufw *bufio.Writer
+    // bufw writes to checkConnErrorWriter{c}, which populates werr on error.
+    bufw *bufio.Writer
 
-	curReq atomic.Value // of *response (which has a Request in it)
-	curState struct{ atomic uint64 } // packed (unixtime<<8|uint8(ConnState))
+    curReq atomic.Value // of *response (which has a Request in it)
+    curState struct{ atomic uint64 } // packed (unixtime<<8|uint8(ConnState))
 }
 ```
 
@@ -71,7 +71,7 @@ type conn struct {
 type Header map[string][]string
 
 type Request struct {
-	Method string
+    Method string
     URL *url.URL
     Header Header
     Body io.ReadCloser
@@ -81,7 +81,7 @@ type Request struct {
 }
 
 type response struct {
-	w  *bufio.Writer // buffers output in chunks to chunkWriter
+    w  *bufio.Writer // buffers output in chunks to chunkWriter
     cw chunkWriter
     handlerHeader Header // handlerHeader is the Header that Handlers get access to
     trailers []string  // trailers are the headers to be sent after the handler finishes writing the body.
@@ -106,15 +106,15 @@ type response struct {
 
 ```go
 type ServeMux struct {
-	mu    sync.RWMutex
-	m     map[string]muxEntry   // m[pattern] = muxEntry
-	es    []muxEntry // slice of entries sorted from longest to shortest.
-	hosts bool       // whether any patterns contain hostnames
+    mu    sync.RWMutex
+    m     map[string]muxEntry   // m[pattern] = muxEntry
+    es    []muxEntry // slice of entries sorted from longest to shortest.
+    hosts bool       // whether any patterns contain hostnames
 }
 
 type muxEntry struct {
-	h       Handler
-	pattern string
+    h       Handler
+    pattern string
 }
 
 // DefaultServeMux is the default ServeMux used by Serve.
@@ -136,23 +136,23 @@ func Handle(pattern string, handler Handler) {
 }
 
 func (mux *ServeMux) Handle(pattern string, handler Handler) {
-	mux.mu.Lock()
-	defer mux.mu.Unlock()
+    mux.mu.Lock()
+    defer mux.mu.Unlock()
 
     // Check Args ...
     
-	if mux.m == nil {
-		mux.m = make(map[string]muxEntry)
-	}
-	e := muxEntry{h: handler, pattern: pattern}
-	mux.m[pattern] = e
-	if pattern[len(pattern)-1] == '/' {
-		mux.es = appendSorted(mux.es, e)
-	}
+    if mux.m == nil {
+        mux.m = make(map[string]muxEntry)
+    }
+    e := muxEntry{h: handler, pattern: pattern}
+    mux.m[pattern] = e
+    if pattern[len(pattern)-1] == '/' {
+        mux.es = appendSorted(mux.es, e)
+    }
 
-	if pattern[0] != '/' {
-		mux.hosts = true
-	}
+    if pattern[0] != '/' {
+        mux.hosts = true
+    }
 }
 ```
 路由注册的流程比较简单，主要就是将`muxEntry`添加到map中，并插入到有序的`[]muxEntry`
@@ -162,8 +162,8 @@ func (mux *ServeMux) Handle(pattern string, handler Handler) {
 
 ```go
 func ListenAndServe(addr string, handler Handler) error {
-	server := &Server{Addr: addr, Handler: handler}
-	return server.ListenAndServe()
+    server := &Server{Addr: addr, Handler: handler}
+    return server.ListenAndServe()
 }
 ```
 
@@ -171,17 +171,17 @@ func ListenAndServe(addr string, handler Handler) error {
 
 ```go
 func (srv *Server) ListenAndServe() error {
-	...
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-	return srv.Serve(ln)
+    ...
+    ln, err := net.Listen("tcp", addr)
+    if err != nil {
+        return err
+    }
+    return srv.Serve(ln)
 }
 
 func Listen(network, address string) (Listener, error) {
-	var lc ListenConfig
-	return lc.Listen(context.Background(), network, address)
+    var lc ListenConfig
+    return lc.Listen(context.Background(), network, address)
 }
 ```
 
@@ -192,25 +192,25 @@ func Listen(network, address string) (Listener, error) {
 
 ```go
 func (srv *Server) Serve(l net.Listener) error {
-	origListener := l
-	l = &onceCloseListener{Listener: l}
-	defer l.Close()
+    origListener := l
+    l = &onceCloseListener{Listener: l}
+    defer l.Close()
     
-	if !srv.trackListener(&l, true) {
-		return ErrServerClosed
-	}
-	defer srv.trackListener(&l, false)
+    if !srv.trackListener(&l, true) {
+        return ErrServerClosed
+    }
+    defer srv.trackListener(&l, false)
 
-	baseCtx := context.Background()
-	if srv.BaseContext != nil {     // Custom baseContext
-		baseCtx = srv.BaseContext(origListener)
-		if baseCtx == nil {
-			panic("BaseContext returned a nil context")
-		}
-	}
+    baseCtx := context.Background()
+    if srv.BaseContext != nil {     // Custom baseContext
+        baseCtx = srv.BaseContext(origListener)
+        if baseCtx == nil {
+            panic("BaseContext returned a nil context")
+        }
+    }
     var tempDelay time.Duration // how long to sleep on accept failure
 
-	ctx := context.WithValue(baseCtx, ServerContextKey, srv)
+    ctx := context.WithValue(baseCtx, ServerContextKey, srv)
     ...
 }
 
@@ -223,40 +223,40 @@ func (srv *Server) Serve(l net.Listener) error {
 ```go
     ...
     for {
-		rw, err := l.Accept()
-		if err != nil {
-			select {
-			case <-srv.getDoneChan():
-				return ErrServerClosed
-			default:
-			}
-			if ne, ok := err.(net.Error); ok && ne.Temporary() {
-				if tempDelay == 0 {
-					tempDelay = 5 * time.Millisecond
-				} else {
-					tempDelay *= 2
-				}
-				if max := 1 * time.Second; tempDelay > max {
-					tempDelay = max
-				}
-				srv.logf("http: Accept error: %v; retrying in %v", err, tempDelay)
-				time.Sleep(tempDelay)
-				continue
-			}
-			return err
-		}
-		connCtx := ctx
-		if cc := srv.ConnContext; cc != nil {   // Custom connContext
-			connCtx = cc(connCtx, rw)
-			if connCtx == nil {
-				panic("ConnContext returned nil")
-			}
-		}
-		tempDelay = 0
-		c := srv.newConn(rw)
-		c.setState(c.rwc, StateNew) // before Serve can return
-		go c.serve(connCtx)
-	}
+        rw, err := l.Accept()
+        if err != nil {
+            select {
+            case <-srv.getDoneChan():
+                return ErrServerClosed
+            default:
+            }
+            if ne, ok := err.(net.Error); ok && ne.Temporary() {
+                if tempDelay == 0 {
+                    tempDelay = 5 * time.Millisecond
+                } else {
+                    tempDelay *= 2
+                }
+                if max := 1 * time.Second; tempDelay > max {
+                    tempDelay = max
+                }
+                srv.logf("http: Accept error: %v; retrying in %v", err, tempDelay)
+                time.Sleep(tempDelay)
+                continue
+            }
+            return err
+        }
+        connCtx := ctx
+        if cc := srv.ConnContext; cc != nil {   // Custom connContext
+            connCtx = cc(connCtx, rw)
+            if connCtx == nil {
+                panic("ConnContext returned nil")
+            }
+        }
+        tempDelay = 0
+        c := srv.newConn(rw)
+        c.setState(c.rwc, StateNew) // before Serve can return
+        go c.serve(connCtx)
+    }
 ```
 
 准备工作完成之后，进入到常见的Server监听循环中。一般的监听循环是每一个连接会使用新的子进程或子线程来处理，Go中则是借助Goroutine以及运行时后台的`NetPoller`来并发处理连接。循环中会根据`Accept`的情况来进行不同的处理：
@@ -274,33 +274,33 @@ func (srv *Server) Serve(l net.Listener) error {
 
 ```go
 func (c *conn) serve(ctx context.Context) {
-	c.remoteAddr = c.rwc.RemoteAddr().String()
-	ctx = context.WithValue(ctx, LocalAddrContextKey, c.rwc.LocalAddr())
-	defer func() {
-		if err := recover(); err != nil && err != ErrAbortHandler {
-			const size = 64 << 10
-			buf := make([]byte, size)
-			buf = buf[:runtime.Stack(buf, false)]
-			c.server.logf("http: panic serving %v: %v\n%s", c.remoteAddr, err, buf)
-		}
-		if !c.hijacked() {
-			c.close()
-			c.setState(c.rwc, StateClosed)
-		}
-	}()
+    c.remoteAddr = c.rwc.RemoteAddr().String()
+    ctx = context.WithValue(ctx, LocalAddrContextKey, c.rwc.LocalAddr())
+    defer func() {
+        if err := recover(); err != nil && err != ErrAbortHandler {
+            const size = 64 << 10
+            buf := make([]byte, size)
+            buf = buf[:runtime.Stack(buf, false)]
+            c.server.logf("http: panic serving %v: %v\n%s", c.remoteAddr, err, buf)
+        }
+        if !c.hijacked() {
+            c.close()
+            c.setState(c.rwc, StateClosed)
+        }
+    }()
     
     // Handle TLS Connection
     ...
     // Handle HTTP 1.x
     ctx, cancelCtx := context.WithCancel(ctx)
-	c.cancelCtx = cancelCtx
-	defer cancelCtx()
+    c.cancelCtx = cancelCtx
+    defer cancelCtx()
 
-	c.r = &connReader{conn: c}
-	c.bufr = newBufioReader(c.r)
-	c.bufw = newBufioWriterSize(checkConnErrorWriter{c}, 4<<10)
-	...
-	// Handle Request
+    c.r = &connReader{conn: c}
+    c.bufr = newBufioReader(c.r)
+    c.bufw = newBufioWriterSize(checkConnErrorWriter{c}, 4<<10)
+    ...
+    // Handle Request
 }
 ```
 
@@ -308,20 +308,20 @@ func (c *conn) serve(ctx context.Context) {
 
 ```go
 var (
-	bufioReaderPool   sync.Pool
-	bufioWriter2kPool sync.Pool
-	bufioWriter4kPool sync.Pool
+    bufioReaderPool   sync.Pool
+    bufioWriter2kPool sync.Pool
+    bufioWriter4kPool sync.Pool
 )
 
 // func newBufioWriterSize 与此函数逻辑类似
 func newBufioReader(r io.Reader) *bufio.Reader {
-	if v := bufioReaderPool.Get(); v != nil {
-		br := v.(*bufio.Reader)
-		br.Reset(r)
-		return br
-	}
+    if v := bufioReaderPool.Get(); v != nil {
+        br := v.(*bufio.Reader)
+        br.Reset(r)
+        return br
+    }
 
-	return bufio.NewReader(r)
+    return bufio.NewReader(r)
 }
 ```
 `bufioReader`和`bufioWriter`会借助`sync.Pool`来实现临时对象缓存，以减少高并发时的GC与对象分配压力。
@@ -334,47 +334,47 @@ func newBufioReader(r io.Reader) *bufio.Reader {
 首先是请求的解析，请求解析通过`conn.readRequest`来完成。如果在解析请求时发生错误，那么会直接返回错误响应并结束连接。
 ```go
     for {
-		w, err := c.readRequest(ctx)
-		if c.r.remain != c.server.initialReadLimitSize() {
-			// If we read any bytes off the wire, we're active.
-			c.setState(c.rwc, StateActive)
-		}
-		if err != nil {
-			const errorHeaders = "\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n"
+        w, err := c.readRequest(ctx)
+        if c.r.remain != c.server.initialReadLimitSize() {
+            // If we read any bytes off the wire, we're active.
+            c.setState(c.rwc, StateActive)
+        }
+        if err != nil {
+            const errorHeaders = "\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n"
 
-			switch {
-			// err case ...
-			default:
+            switch {
+            // err case ...
+            default:
                 publicErr := "400 Bad Request"
                 ...
-				return
-			}
-		}
-		// Expect 100 Continue support ...
-		// Register Background Read ...
+                return
+            }
+        }
+        // Expect 100 Continue support ...
+        // Register Background Read ...
         // Handle Response ...
     }
 ```
 `conn.readRequest`首先是设置超时时间，并通过`connReader.setReadLimit()`设置可读大小为1MB + 4KB
 ```go
 func (c *conn) readRequest(ctx context.Context) (w *response, err error) {
-	var (
-		wholeReqDeadline time.Time // or zero if none
-		hdrDeadline      time.Time // or zero if none
-	)
-	t0 := time.Now()
-	if d := c.server.readHeaderTimeout(); d != 0 {
-		hdrDeadline = t0.Add(d)
-	}
-	if d := c.server.ReadTimeout; d != 0 {
-		wholeReqDeadline = t0.Add(d)
-	}
-	c.rwc.SetReadDeadline(hdrDeadline)
-	if d := c.server.WriteTimeout; d != 0 {
-		defer func() {
-			c.rwc.SetWriteDeadline(time.Now().Add(d))
-		}()
-	}
+    var (
+        wholeReqDeadline time.Time // or zero if none
+        hdrDeadline      time.Time // or zero if none
+    )
+    t0 := time.Now()
+    if d := c.server.readHeaderTimeout(); d != 0 {
+        hdrDeadline = t0.Add(d)
+    }
+    if d := c.server.ReadTimeout; d != 0 {
+        wholeReqDeadline = t0.Add(d)
+    }
+    c.rwc.SetReadDeadline(hdrDeadline)
+    if d := c.server.WriteTimeout; d != 0 {
+        defer func() {
+            c.rwc.SetWriteDeadline(time.Now().Add(d))
+        }()
+    }
 
     c.r.setReadLimit(c.server.initialReadLimitSize())   // 1MB + 4KB
     ...
@@ -383,32 +383,32 @@ func (c *conn) readRequest(ctx context.Context) (w *response, err error) {
 随后通过`readRequest()`进行正式的读取工作，函数返回后，HTTP Header解析完成。如果读取请求过程中请求头过大，则会返回`errTooLarge`。如果HTTP Header正常，那么将会构造`response`并返回。
 ```go
     req, err := readRequest(c.bufr, keepHostHeader)
-	if err != nil {
-		if c.r.hitReadLimit() {
-			return nil, errTooLarge
-		}
-		return nil, err
-	}
+    if err != nil {
+        if c.r.hitReadLimit() {
+            return nil, errTooLarge
+        }
+        return nil, err
+    }
 
     c.r.setInfiniteReadLimit() 
     
     // Valid HTTP Header ...
 
     w = &response{
-		conn:          c,
-		cancelCtx:     cancelCtx,
-		req:           req,
-		reqBody:       req.Body,
-		handlerHeader: make(Header),
-		contentLength: -1,
-		closeNotifyCh: make(chan bool, 1),
-		wants10KeepAlive: req.wantsHttp10KeepAlive(),
-		wantsClose:       req.wantsClose(),
+        conn:          c,
+        cancelCtx:     cancelCtx,
+        req:           req,
+        reqBody:       req.Body,
+        handlerHeader: make(Header),
+        contentLength: -1,
+        closeNotifyCh: make(chan bool, 1),
+        wants10KeepAlive: req.wantsHttp10KeepAlive(),
+        wantsClose:       req.wantsClose(),
     }
     
-	w.cw.res = w
-	w.w = newBufioWriterSize(&w.cw, bufferBeforeChunkingSize)
-	return w, nil
+    w.cw.res = w
+    w.w = newBufioWriterSize(&w.cw, bufferBeforeChunkingSize)
+    return w, nil
 ```
 
 ##### 读取Header
@@ -430,22 +430,22 @@ HTTP包以字节流的形式交付至传输层TCP，TCP会提供传输的可靠�
 `readRequest()`首先会通过`textproto.Reader`（同样使用了临时对象池来减少开销）来对`conn.bufr`进行包装以支持一些快捷的文本读取操作，在这之后，则是对HTTP Header的第一行文本进行解析与校验。
 ```go
 func readRequest(b *bufio.Reader, deleteHostHeader bool) (req *Request, err error) {
-	tp := newTextprotoReader(b)
-	req = new(Request)
+    tp := newTextprotoReader(b)
+    req = new(Request)
 
-	// First line: GET /index.html HTTP/1.0
-	var s string
-	if s, err = tp.ReadLine(); err != nil {
-		return nil, err
-	}
-	defer func() {
-		putTextprotoReader(tp)
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-	}()
+    // First line: GET /index.html HTTP/1.0
+    var s string
+    if s, err = tp.ReadLine(); err != nil {
+        return nil, err
+    }
+    defer func() {
+        putTextprotoReader(tp)
+        if err == io.EOF {
+            err = io.ErrUnexpectedEOF
+        }
+    }()
 
-	var ok bool
+    var ok bool
     req.Method, req.RequestURI, req.Proto, ok = parseRequestLine(s)
     
     // Parse And Valid ...
@@ -455,10 +455,10 @@ func readRequest(b *bufio.Reader, deleteHostHeader bool) (req *Request, err erro
 
 ```go
     // Subsequent lines: Key: value.
-	mimeHeader, err := tp.ReadMIMEHeader()
-	if err != nil {
-		return nil, err
-	}
+    mimeHeader, err := tp.ReadMIMEHeader()
+    if err != nil {
+        return nil, err
+    }
     req.Header = Header(mimeHeader)
     
     req.Close = shouldClose(req.ProtoMajor, req.ProtoMinor, req.Header, false)
@@ -466,9 +466,9 @@ func readRequest(b *bufio.Reader, deleteHostHeader bool) (req *Request, err erro
 
 读取完Header之后，则是通过[`readTransfer()`](https://github.com/golang/go/blob/release-branch.go1.14/src/net/http/transfer.go#L470)将Body的读取接口挂载等待用户Handler的读取。
 ```go
-	err = readTransfer(req, b)
-	if err != nil {
-		return nil, err
+    err = readTransfer(req, b)
+    if err != nil {
+        return nil, err
     }
     
     return req, nil
@@ -478,28 +478,28 @@ func readRequest(b *bufio.Reader, deleteHostHeader bool) (req *Request, err erro
 
 ```go
 func readTransfer(msg interface{}, r *bufio.Reader) (err error) {
-	t := &transferReader{RequestMethod: "GET"}
+    t := &transferReader{RequestMethod: "GET"}
 
-	// Unify input
-	isResponse := false
-	switch rr := msg.(type) {
-	case *Response:
-		...
-	case *Request:
-		t.Header = rr.Header
-		t.RequestMethod = rr.Method
-		t.ProtoMajor = rr.ProtoMajor
-		t.ProtoMinor = rr.ProtoMinor
-		t.StatusCode = 200
-		t.Close = rr.Close
-	default:
-		panic("unexpected type")
-	}
+    // Unify input
+    isResponse := false
+    switch rr := msg.(type) {
+    case *Response:
+        ...
+    case *Request:
+        t.Header = rr.Header
+        t.RequestMethod = rr.Method
+        t.ProtoMajor = rr.ProtoMajor
+        t.ProtoMinor = rr.ProtoMinor
+        t.StatusCode = 200
+        t.Close = rr.Close
+    default:
+        panic("unexpected type")
+    }
 
-	// Transfer encoding, content length
+    // Transfer encoding, content length
     err = t.fixTransferEncoding()
     
-	realLength, err := fixLength(isResponse, t.StatusCode, t.RequestMethod, t.Header, t.TransferEncoding)
+    realLength, err := fixLength(isResponse, t.StatusCode, t.RequestMethod, t.Header, t.TransferEncoding)
 
 ```
 
@@ -510,26 +510,26 @@ func readTransfer(msg interface{}, r *bufio.Reader) (err error) {
 
 ```go
     switch {
-	case chunked(t.TransferEncoding):
-		if noResponseBodyExpected(t.RequestMethod) || !bodyAllowedForStatus(t.StatusCode) {
-			t.Body = NoBody
-		} else {
-			t.Body = &body{src: internal.NewChunkedReader(r), hdr: msg, r: r, closing: t.Close}
-		}
-	case realLength == 0:
-		t.Body = NoBody
-	case realLength > 0:
-		t.Body = &body{src: io.LimitReader(r, realLength), closing: t.Close}
-	default:
-		// realLength < 0, i.e. "Content-Length" not mentioned in header
-		if t.Close {
-			// Close semantics (i.e. HTTP/1.0)
-			t.Body = &body{src: r, closing: t.Close}
-		} else {
-			// Persistent connection (i.e. HTTP/1.1)
-			t.Body = NoBody
-		}
-	}
+    case chunked(t.TransferEncoding):
+        if noResponseBodyExpected(t.RequestMethod) || !bodyAllowedForStatus(t.StatusCode) {
+            t.Body = NoBody
+        } else {
+            t.Body = &body{src: internal.NewChunkedReader(r), hdr: msg, r: r, closing: t.Close}
+        }
+    case realLength == 0:
+        t.Body = NoBody
+    case realLength > 0:
+        t.Body = &body{src: io.LimitReader(r, realLength), closing: t.Close}
+    default:
+        // realLength < 0, i.e. "Content-Length" not mentioned in header
+        if t.Close {
+            // Close semantics (i.e. HTTP/1.0)
+            t.Body = &body{src: r, closing: t.Close}
+        } else {
+            // Persistent connection (i.e. HTTP/1.1)
+            t.Body = NoBody
+        }
+    }
 ```
 
 Body读取接口挂载完成之后，此时相当于HTTP包已经解析完毕，返回解析后的`*Request`结构体，之后则是将控制权交由用户注册的Handler。下一节，我们会看看用户Handler是如何读取Request Body的。
@@ -541,40 +541,40 @@ Body读取时，提供给用户Handler为实现了`ReadCloser`接口的[`body`](
 
 ```go
 func (b *body) Read(p []byte) (n int, err error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.closed {
-		return 0, ErrBodyReadAfterClose
-	}
-	return b.readLocked(p)
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    if b.closed {
+        return 0, ErrBodyReadAfterClose
+    }
+    return b.readLocked(p)
 }
 
 func (b *body) readLocked(p []byte) (n int, err error) {
-	if b.sawEOF {
-		return 0, io.EOF
-	}
-	n, err = b.src.Read(p)
+    if b.sawEOF {
+        return 0, io.EOF
+    }
+    n, err = b.src.Read(p)
 
-	if err == io.EOF {
+    if err == io.EOF {
         // check 
-		b.sawEOF = true
-		// Chunked case. Read the trailer.
-		if b.hdr != nil {
-			if e := b.readTrailer(); e != nil {
-				err = e
-				// Something went wrong in the trailer, disable we must not allow any
-				// further reads of any kind to succeed from body
-				b.sawEOF = false
-				b.closed = true
-			}
-			b.hdr = nil
-		} else {
-			// If the server declared the Content-Length, our body is a LimitedReader
-			// and we need to check whether this EOF arrived early.
-			if lr, ok := b.src.(*io.LimitedReader); ok && lr.N > 0 {
-				err = io.ErrUnexpectedEOF
-			}
-		}
+        b.sawEOF = true
+        // Chunked case. Read the trailer.
+        if b.hdr != nil {
+            if e := b.readTrailer(); e != nil {
+                err = e
+                // Something went wrong in the trailer, disable we must not allow any
+                // further reads of any kind to succeed from body
+                b.sawEOF = false
+                b.closed = true
+            }
+            b.hdr = nil
+        } else {
+            // If the server declared the Content-Length, our body is a LimitedReader
+            // and we need to check whether this EOF arrived early.
+            if lr, ok := b.src.(*io.LimitedReader); ok && lr.N > 0 {
+                err = io.ErrUnexpectedEOF
+            }
+        }
     }
     
     // more check EOF ...
@@ -585,37 +585,37 @@ func (b *body) readLocked(p []byte) (n int, err error) {
 
 ```go
 func (b *body) Close() error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.closed {
-		return nil
-	}
-	var err error
-	switch {
-	case b.sawEOF:
-	case b.hdr == nil && b.closing:
-	case b.doEarlyClose:
-		if lr, ok := b.src.(*io.LimitedReader); ok && lr.N > maxPostHandlerReadBytes {
-			b.earlyClose = true
-		} else {
-			var n int64
-			// Consume the body, or, which will also lead to us reading
-			// the trailer headers after the body, if present.
-			n, err = io.CopyN(ioutil.Discard, bodyLocked{b}, maxPostHandlerReadBytes)
-			if err == io.EOF {
-				err = nil
-			}
-			if n == maxPostHandlerReadBytes {
-				b.earlyClose = true
-			}
-		}
-	default:
-		// Fully consume the body, which will also lead to us reading
-		// the trailer headers after the body, if present.
-		_, err = io.Copy(ioutil.Discard, bodyLocked{b})
-	}
-	b.closed = true
-	return err
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    if b.closed {
+        return nil
+    }
+    var err error
+    switch {
+    case b.sawEOF:
+    case b.hdr == nil && b.closing:
+    case b.doEarlyClose:
+        if lr, ok := b.src.(*io.LimitedReader); ok && lr.N > maxPostHandlerReadBytes {
+            b.earlyClose = true
+        } else {
+            var n int64
+            // Consume the body, or, which will also lead to us reading
+            // the trailer headers after the body, if present.
+            n, err = io.CopyN(ioutil.Discard, bodyLocked{b}, maxPostHandlerReadBytes)
+            if err == io.EOF {
+                err = nil
+            }
+            if n == maxPostHandlerReadBytes {
+                b.earlyClose = true
+            }
+        }
+    default:
+        // Fully consume the body, which will also lead to us reading
+        // the trailer headers after the body, if present.
+        _, err = io.Copy(ioutil.Discard, bodyLocked{b})
+    }
+    b.closed = true
+    return err
 }
 ```
 
@@ -635,25 +635,25 @@ Server在解析HTTP包时，顺序读取解析HTTP Header，通过Header中的�
         serverHandler{c.server}.ServeHTTP(w, w.req)
         
         // Send Response
-		...
+        ...
     }
 ```
 `serverHandler`会获取预配置的Handler，并调用`handler.ServeHTTP(rw, req)`。
 
 ```go
 type serverHandler struct {
-	srv *Server
+    srv *Server
 }
 
 func (sh serverHandler) ServeHTTP(rw ResponseWriter, req *Request) {
-	handler := sh.srv.Handler
-	if handler == nil {
-		handler = DefaultServeMux
-	}
-	if req.RequestURI == "*" && req.Method == "OPTIONS" {
-		handler = globalOptionsHandler{}
-	}
-	handler.ServeHTTP(rw, req)
+    handler := sh.srv.Handler
+    if handler == nil {
+        handler = DefaultServeMux
+    }
+    if req.RequestURI == "*" && req.Method == "OPTIONS" {
+        handler = globalOptionsHandler{}
+    }
+    handler.ServeHTTP(rw, req)
 }
 ```
 
@@ -661,37 +661,37 @@ func (sh serverHandler) ServeHTTP(rw ResponseWriter, req *Request) {
 
 ```go
 func (mux *ServeMux) ServeHTTP(w ResponseWriter, r *Request) {
-	if r.RequestURI == "*" {
-		// Return Bad Request 
+    if r.RequestURI == "*" {
+        // Return Bad Request 
     }
 
-	h, _ := mux.Handler(r)  // Get Handler h
-	h.ServeHTTP(w, r)   // User Handle
+    h, _ := mux.Handler(r)  // Get Handler h
+    h.ServeHTTP(w, r)   // User Handle
 }
 
 func (mux *ServeMux) Handler(r *Request) (h Handler, pattern string) {
 
-	if r.Method == "CONNECT" {
-		// return 
-	}
+    if r.Method == "CONNECT" {
+        // return 
+    }
 
-	host := stripHostPort(r.Host)
-	path := cleanPath(r.URL.Path)
+    host := stripHostPort(r.Host)
+    path := cleanPath(r.URL.Path)
 
-	// If the given path is /tree and its handler is not registered,
-	// redirect for /tree/.
-	if u, ok := mux.redirectToPathSlash(host, path, r.URL); ok {
-		return RedirectHandler(u.String(), StatusMovedPermanently), u.Path
-	}
+    // If the given path is /tree and its handler is not registered,
+    // redirect for /tree/.
+    if u, ok := mux.redirectToPathSlash(host, path, r.URL); ok {
+        return RedirectHandler(u.String(), StatusMovedPermanently), u.Path
+    }
 
-	if path != r.URL.Path {
-		_, pattern = mux.handler(host, path)
-		url := *r.URL
-		url.Path = path
-		return RedirectHandler(url.String(), StatusMovedPermanently), pattern
-	}
+    if path != r.URL.Path {
+        _, pattern = mux.handler(host, path)
+        url := *r.URL
+        url.Path = path
+        return RedirectHandler(url.String(), StatusMovedPermanently), pattern
+    }
 
-	return mux.handler(host, r.URL.Path)
+    return mux.handler(host, r.URL.Path)
 }
 ```
 
@@ -703,20 +703,20 @@ func (mux *ServeMux) Handler(r *Request) (h Handler, pattern string) {
 
 ```go
 func (mux *ServeMux) handler(host, path string) (h Handler, pattern string) {
-	mux.mu.RLock()
-	defer mux.mu.RUnlock()
+    mux.mu.RLock()
+    defer mux.mu.RUnlock()
 
-	// Host-specific pattern takes precedence over generic ones
-	if mux.hosts {
-		h, pattern = mux.match(host + path)
-	}
-	if h == nil {
-		h, pattern = mux.match(path)
-	}
-	if h == nil {
-		h, pattern = NotFoundHandler(), ""
-	}
-	return
+    // Host-specific pattern takes precedence over generic ones
+    if mux.hosts {
+        h, pattern = mux.match(host + path)
+    }
+    if h == nil {
+        h, pattern = mux.match(path)
+    }
+    if h == nil {
+        h, pattern = NotFoundHandler(), ""
+    }
+    return
 }
 ```
 
@@ -724,20 +724,20 @@ func (mux *ServeMux) handler(host, path string) (h Handler, pattern string) {
 
 ```go
 func (mux *ServeMux) match(path string) (h Handler, pattern string) {
-	// Check for exact match first.
-	v, ok := mux.m[path]
-	if ok {
-		return v.h, v.pattern
-	}
+    // Check for exact match first.
+    v, ok := mux.m[path]
+    if ok {
+        return v.h, v.pattern
+    }
 
-	// Check for longest valid match.  mux.es contains all patterns
-	// that end in / sorted from longest to shortest.
-	for _, e := range mux.es {
-		if strings.HasPrefix(path, e.pattern) {
-			return e.h, e.pattern
-		}
-	}
-	return nil, ""
+    // Check for longest valid match.  mux.es contains all patterns
+    // that end in / sorted from longest to shortest.
+    for _, e := range mux.es {
+        if strings.HasPrefix(path, e.pattern) {
+            return e.h, e.pattern
+        }
+    }
+    return nil, ""
 }
 ```
 
@@ -765,7 +765,7 @@ func handler(w http.ResponseWriter, r *http.Request)  {
         serverHandler{c.server}.ServeHTTP(w, w.req)
         w.finishRequest()
         // Reuse Connection ?
-		...
+        ...
     }
 ```
 
@@ -779,24 +779,24 @@ func handler(w http.ResponseWriter, r *http.Request)  {
 
 ```go
 func (w *response) finishRequest() {
-	w.handlerDone.setTrue()
+    w.handlerDone.setTrue()
 
-	if !w.wroteHeader {
-		w.WriteHeader(StatusOK) // 200 OK
-	}
+    if !w.wroteHeader {
+        w.WriteHeader(StatusOK) // 200 OK
+    }
 
-	w.w.Flush()
-	putBufioWriter(w.w)
-	w.cw.close()
-	w.conn.bufw.Flush()
+    w.w.Flush()
+    putBufioWriter(w.w)
+    w.cw.close()
+    w.conn.bufw.Flush()
 
-	// Close the body (regardless of w.closeAfterReply) so we can
-	// re-use its bufio.Reader later safely.
-	w.reqBody.Close()
+    // Close the body (regardless of w.closeAfterReply) so we can
+    // re-use its bufio.Reader later safely.
+    w.reqBody.Close()
 
-	if w.req.MultipartForm != nil {
-		w.req.MultipartForm.RemoveAll()
-	}
+    if w.req.MultipartForm != nil {
+        w.req.MultipartForm.RemoveAll()
+    }
 }
 ```
 
@@ -812,30 +812,30 @@ func handler(w http.ResponseWriter, r *http.Request)  {
 }
 
 func (w *response) Write(data []byte) (n int, err error) {
-	return w.write(len(data), data, "")
+    return w.write(len(data), data, "")
 }
 
 // either dataB or dataS is non-zero.
 func (w *response) write(lenData int, dataB []byte, dataS string) (n int, err error) {
-	if !w.wroteHeader {
-		w.WriteHeader(StatusOK)
-	}
-	if lenData == 0 {
-		return 0, nil
-	}
-	if !w.bodyAllowed() {
-		return 0, ErrBodyNotAllowed
-	}
+    if !w.wroteHeader {
+        w.WriteHeader(StatusOK)
+    }
+    if lenData == 0 {
+        return 0, nil
+    }
+    if !w.bodyAllowed() {
+        return 0, ErrBodyNotAllowed
+    }
 
-	w.written += int64(lenData) // ignoring errors, for errorKludge
-	if w.contentLength != -1 && w.written > w.contentLength {
-		return 0, ErrContentLength
-	}
-	if dataB != nil {
-		return w.w.Write(dataB)
-	} else {
-		return w.w.WriteString(dataS)
-	}
+    w.written += int64(lenData) // ignoring errors, for errorKludge
+    if w.contentLength != -1 && w.written > w.contentLength {
+        return 0, ErrContentLength
+    }
+    if dataB != nil {
+        return w.w.Write(dataB)
+    } else {
+        return w.w.WriteString(dataS)
+    }
 }
 ```
 
@@ -845,27 +845,27 @@ func (w *response) write(lenData int, dataB []byte, dataS string) (n int, err er
 
 ```go
 func (cw *chunkWriter) Write(p []byte) (n int, err error) {
-	if !cw.wroteHeader {
-		cw.writeHeader(p)
-	}
-	if cw.res.req.Method == "HEAD" {
-		return len(p), nil
-	}
-	if cw.chunking {
-		_, err = fmt.Fprintf(cw.res.conn.bufw, "%x\r\n", len(p))
-		if err != nil {
-			cw.res.conn.rwc.Close()
-			return
-		}
-	}
-	n, err = cw.res.conn.bufw.Write(p)
-	if cw.chunking && err == nil {
-		_, err = cw.res.conn.bufw.Write(crlf)
-	}
-	if err != nil {
-		cw.res.conn.rwc.Close()
-	}
-	return
+    if !cw.wroteHeader {
+        cw.writeHeader(p)
+    }
+    if cw.res.req.Method == "HEAD" {
+        return len(p), nil
+    }
+    if cw.chunking {
+        _, err = fmt.Fprintf(cw.res.conn.bufw, "%x\r\n", len(p))
+        if err != nil {
+            cw.res.conn.rwc.Close()
+            return
+        }
+    }
+    n, err = cw.res.conn.bufw.Write(p)
+    if cw.chunking && err == nil {
+        _, err = cw.res.conn.bufw.Write(crlf)
+    }
+    if err != nil {
+        cw.res.conn.rwc.Close()
+    }
+    return
 }
 ```
 
@@ -875,12 +875,12 @@ func (cw *chunkWriter) Write(p []byte) (n int, err error) {
 
 ```go
 func (w checkConnErrorWriter) Write(p []byte) (n int, err error) {
-	n, err = w.c.rwc.Write(p)
-	if err != nil && w.c.werr == nil {
-		w.c.werr = err
-		w.c.cancelCtx()
-	}
-	return
+    n, err = w.c.rwc.Write(p)
+    if err != nil && w.c.werr == nil {
+        w.c.werr = err
+        w.c.cancelCtx()
+    }
+    return
 }
 ```
 
@@ -900,28 +900,28 @@ HTTPServer提供了优雅关闭服务的能力，用户可以通过`Server.Shutd
 
 ```go
 func (srv *Server) Shutdown(ctx context.Context) error {
-	atomic.StoreInt32(&srv.inShutdown, 1)
+    atomic.StoreInt32(&srv.inShutdown, 1)
 
-	srv.mu.Lock()
-	lnerr := srv.closeListenersLocked()
-	srv.closeDoneChanLocked()
-	for _, f := range srv.onShutdown {
-		go f()
-	}
-	srv.mu.Unlock()
+    srv.mu.Lock()
+    lnerr := srv.closeListenersLocked()
+    srv.closeDoneChanLocked()
+    for _, f := range srv.onShutdown {
+        go f()
+    }
+    srv.mu.Unlock()
 
-	ticker := time.NewTicker(shutdownPollInterval)
-	defer ticker.Stop()
-	for {
-		if srv.closeIdleConns() {
-			return lnerr
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-		}
-	}
+    ticker := time.NewTicker(shutdownPollInterval)
+    defer ticker.Stop()
+    for {
+        if srv.closeIdleConns() {
+            return lnerr
+        }
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        case <-ticker.C:
+        }
+    }
 }
 ```
 
